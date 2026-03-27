@@ -3,8 +3,11 @@
 记录你的每一个预言，验证你的直觉。 一个让你创建、追踪并验证个人预言的应用。
 
 https://img.shields.io/badge/Flutter-3.19-blue](https://flutter.dev)
+
 https://img.shields.io/badge/Dart-3.3-blue](https://dart.dev)
+
 https://img.shields.io/badge/License-MIT-green.svg](LICENSE)
+
 https://img.shields.io/badge/版本-V0.1_基础版-orange](https://github.com/sytq2000/SeerX)
 
 ✨ 特性
