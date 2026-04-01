@@ -1,5 +1,6 @@
 // lib/pages/home_page.dart
 import 'package:flutter/material.dart';
+import '../models/prediction.dart';  // 新增导入
 import '../services/prediction_service.dart';
 import '../widgets/prediction_card.dart';
 import 'create_page.dart';
@@ -13,46 +14,63 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  List _predictions = [];
-  
+  List<Prediction> _predictions = [];
+  bool _isLoading = true;
+
   @override
   void initState() {
     super.initState();
-    _loadPredictions();
+    _initializeApp();
   }
-  
+
+  Future<void> _initializeApp() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      await PredictionService.init();
+      _loadPredictions();
+    } catch (e) {
+      print('应用初始化失败: $e');
+      _loadPredictions();
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
   void _loadPredictions() {
     setState(() {
       _predictions = PredictionService.getAllPredictions();
     });
   }
-  
-  void _navigateToCreatePage() async {
+
+  Future<void> _navigateToCreatePage() async {
     final result = await Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const CreatePage()),
     );
-    
-    // 如果创建了新的预言，重新加载列表
+
     if (result == true) {
       _loadPredictions();
     }
   }
-  
-  void _navigateToDetailPage(String predictionId) async {
+
+  Future<void> _navigateToDetailPage(String predictionId) async {
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => DetailPage(predictionId: predictionId),
       ),
     );
-    
-    // 如果裁决了预言，重新加载列表
+
     if (result == true) {
       _loadPredictions();
     }
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -62,7 +80,6 @@ class _HomePageState extends State<HomePage> {
           IconButton(
             icon: const Icon(Icons.person),
             onPressed: () {
-              // 个人中心页（后续实现）
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('个人中心页面开发中...')),
               );
@@ -70,30 +87,39 @@ class _HomePageState extends State<HomePage> {
           ),
         ],
       ),
-      
-      body: _predictions.isEmpty
+      body: _isLoading
           ? const Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.auto_awesome, size: 64, color: Colors.grey),
+                  CircularProgressIndicator(),
                   SizedBox(height: 16),
-                  Text('还没有任何预言', style: TextStyle(fontSize: 18)),
-                  Text('点击下方按钮创建第一个预言', style: TextStyle(color: Colors.grey)),
+                  Text('加载预言中...', style: TextStyle(fontSize: 16)),
                 ],
               ),
             )
-          : ListView.builder(
-              itemCount: _predictions.length,
-              itemBuilder: (context, index) {
-                final prediction = _predictions[index];
-                return PredictionCard(
-                  prediction: prediction,
-                  onTap: () => _navigateToDetailPage(prediction.id),
-                );
-              },
-            ),
-      
+          : _predictions.isEmpty
+              ? const Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.auto_awesome, size: 64, color: Colors.grey),
+                      SizedBox(height: 16),
+                      Text('还没有任何预言', style: TextStyle(fontSize: 18)),
+                      Text('点击下方按钮创建第一个预言', style: TextStyle(color: Colors.grey)),
+                    ],
+                  ),
+                )
+              : ListView.builder(
+                  itemCount: _predictions.length,
+                  itemBuilder: (context, index) {
+                    final prediction = _predictions[index];
+                    return PredictionCard(
+                      prediction: prediction,
+                      onTap: () => _navigateToDetailPage(prediction.id),
+                    );
+                  },
+                ),
       floatingActionButton: FloatingActionButton(
         onPressed: _navigateToCreatePage,
         backgroundColor: Colors.blue,

@@ -23,10 +23,31 @@ class _DetailPageState extends State<DetailPage> {
   }
   
   void _loadPrediction() {
-    setState(() {
-      _prediction = PredictionService.getPredictionById(widget.predictionId);
-    });
+  setState(() {
+    _prediction = PredictionService.getPredictionById(widget.predictionId);
+  });
+  
+  // 如果找到了预言，检查是否需要更新状态
+  if (_prediction != null) {
+    _checkAndUpdatePredictionStatus();
   }
+}
+
+void _checkAndUpdatePredictionStatus() {
+  final now = DateTime.now();
+  final prediction = _prediction!;
+  
+  // 如果预言是"待验证"状态，但到期时间已经到了
+  if (prediction.status == 'pending' && 
+      (prediction.dueDate.isBefore(now) || prediction.dueDate.isAtSameMomentAs(now))) {
+    
+    // 更新状态为"待裁决"
+    PredictionService.judgePrediction(prediction.id, false); // 这里传false，因为我们只是更新状态，不是裁决
+    
+    // 重新加载预言
+    _loadPrediction();
+  }
+}
   
 void _judgePrediction(bool isSuccess) {
   if (_prediction != null) {
