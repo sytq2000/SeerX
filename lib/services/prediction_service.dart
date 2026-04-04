@@ -115,4 +115,68 @@ class PredictionService {
       ),
     ];
   }
+  // ========== 新增：V0.3 数据统计方法 ==========
+
+  /// 获取用户预言统计数据
+  static Map<String, dynamic> getPredictionStats() {
+    final now = DateTime.now();
+    int total = _predictions.length;
+    int successful = 0;
+    int failed = 0;
+    int pending = 0;
+    int judging = 0;
+    
+    // 遍历所有预言，按状态分类计数
+    for (var prediction in _predictions) {
+      switch (prediction.status) {
+        case 'success':
+          successful++;
+          break;
+        case 'failure':
+          failed++;
+          break;
+        case 'judging':
+          judging++;
+          break;
+        case 'pending':
+          // 检查是否需要自动更新为"待裁决"
+          if (prediction.dueDate.isBefore(now) || 
+              prediction.dueDate.isAtSameMomentAs(now)) {
+            judging++; // 统计时计入待裁决
+          } else {
+            pending++;
+          }
+          break;
+      }
+    }
+    
+    // 计算成功率（避免除零错误）
+    double successRate = 0.0;
+    int judgedTotal = successful + failed;
+    if (judgedTotal > 0) {
+      successRate = (successful / judgedTotal) * 100;
+    }
+    
+    return {
+      'total': total,
+      'successful': successful,
+      'failed': failed,
+      'pending': pending,
+      'judging': judging,
+      'successRate': successRate,
+    };
+  }
+
+  /// 获取最近的预言（用于可能的趋势分析）
+  static List<Prediction> getRecentPredictions({int limit = 10}) {
+    if (_predictions.isEmpty) return [];
+    
+    // 按创建时间倒序排列，取最新的
+    List<Prediction> sorted = List.from(_predictions);
+    sorted.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    
+    return sorted.take(limit).toList();
+  }
+
+
 }
