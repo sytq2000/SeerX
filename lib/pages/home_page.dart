@@ -5,6 +5,8 @@ import '../services/prediction_service.dart';
 import '../widgets/prediction_card.dart';
 import 'create_page.dart';
 import 'detail_page.dart';
+// 在 home_page.dart 的导入部分添加
+import 'profile_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -76,16 +78,34 @@ class _HomePageState extends State<HomePage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('我的预言'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.person),
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('个人中心页面开发中...')),
-              );
-            },
-          ),
-        ],
+        // 在 home_page.dart 的 AppBar actions 中，修改以下部分：
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.person),
+          onPressed: () {
+            // 修改前：显示SnackBar
+            // ScaffoldMessenger.of(context).showSnackBar(
+            //   const SnackBar(content: Text('个人中心页面开发中...')),
+            // );
+            
+            // 修改后：导航到个人中心页面
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const ProfilePage()),
+            );
+          },
+        ),
+      ],
+        // actions: [
+        //   IconButton(
+        //     icon: const Icon(Icons.person),
+        //     onPressed: () {
+        //       ScaffoldMessenger.of(context).showSnackBar(
+        //         const SnackBar(content: Text('个人中心页面开发中...')),
+        //       );
+        //     },
+        //   ),
+        // ],
       ),
       body: _isLoading
           ? const Center(
