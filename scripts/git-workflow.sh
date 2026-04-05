@@ -588,7 +588,7 @@ run_app_validation() {
     case $validation_option in
         1)
             print_info "在 Chrome 中运行应用..."
-            flutter run -d chrome
+            flutter run -d chrome --web-port 8080
             ;;
         2)
             print_info "分析代码..."

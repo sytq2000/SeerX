@@ -4,9 +4,13 @@ class Prediction {
   final String content;
   final DateTime createdAt;
   final DateTime dueDate;
-  final String status; // 'pending', 'judging', 'success', 'failure'
+  final String status;
   final bool? isSuccess;
   final DateTime? judgedAt;
+  
+  // ========== V0.5 新增：标签字段 ==========
+  final String? tag; // 标签（可空，兼容旧数据）
+  // ========================================
   
   Prediction({
     required this.id,
@@ -15,6 +19,7 @@ class Prediction {
     this.status = 'pending',
     this.isSuccess,
     this.judgedAt,
+    this.tag, // 新增参数
   }) : createdAt = DateTime.now();
   
   // 创建一个更新状态的副本
@@ -22,6 +27,7 @@ class Prediction {
     String? status,
     bool? isSuccess,
     DateTime? judgedAt,
+    String? tag, // 新增：支持更新标签
   }) {
     return Prediction(
       id: id,
@@ -30,10 +36,11 @@ class Prediction {
       status: status ?? this.status,
       isSuccess: isSuccess ?? this.isSuccess,
       judgedAt: judgedAt ?? this.judgedAt,
+      tag: tag ?? this.tag, // 复制标签
     );
   }
 
-  // === 新增代码开始：V0.2 数据持久化支持 ===
+  // === 数据持久化支持 ===
   
   /// 将 Prediction 对象转换为 Map（可用于转换为JSON字符串）
   Map<String, dynamic> toJson() {
@@ -45,6 +52,9 @@ class Prediction {
       'status': status,
       'isSuccess': isSuccess,
       'judgedAt': judgedAt?.toIso8601String(),
+      // ========== V0.5 新增：标签序列化 ==========
+      'tag': tag,
+      // =========================================
     };
   }
 
@@ -57,7 +67,10 @@ class Prediction {
       status: json['status'],
       isSuccess: json['isSuccess'],
       judgedAt: json['judgedAt'] != null ? DateTime.parse(json['judgedAt']) : null,
+      // ========== V0.5 新增：标签反序列化 ==========
+      // 注意：旧数据可能没有tag字段，所以这里需要处理null情况
+      tag: json['tag'],
+      // ===========================================
     );
   }
-  // === 新增代码结束 ===
 }
