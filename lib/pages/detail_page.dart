@@ -134,6 +134,25 @@ void _judgePrediction(bool isSuccess) {
                 style: const TextStyle(fontSize: 18, height: 1.5),
               ),
             ),
+
+            // ========== V0.5 新增：标签显示 ==========
+            if (prediction.tag != null && prediction.tag!.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 12.0),
+                child: Wrap(
+                  children: [
+                    Chip(
+                      label: Text(
+                        prediction.tag!,
+                        style: const TextStyle(fontSize: 14, color: Colors.white),
+                      ),
+                      backgroundColor: Colors.blue,
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    ),
+                  ],
+                ),
+              ),
+            // =======================================
             
             const SizedBox(height: 24),
             

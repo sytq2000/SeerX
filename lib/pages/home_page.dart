@@ -17,6 +17,8 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   List<Prediction> _predictions = [];
   bool _isLoading = true;
+  // 控制是否显示所有标签
+  bool _showAllTags = false;
 
   // ========== V0.4 新增：筛选与搜索状态 ==========
   String _searchKeyword = ''; // 搜索关键词
@@ -25,6 +27,9 @@ class _HomePageState extends State<HomePage> {
   
   // 修复：使用持久的 TextEditingController
   late final TextEditingController _searchController;
+  
+  // ========== V0.5 新增：标签筛选状态 ==========
+  String? _selectedTagFilter; // 用于筛选的标签，null 表示"全部标签"
   // ============================================
 
   @override
@@ -85,7 +90,15 @@ class _HomePageState extends State<HomePage> {
               .toLowerCase()
               .contains(_searchKeyword.toLowerCase());
 
-      return statusMatches && keywordMatches;
+      // 3. ========== V0.5 新增：标签筛选逻辑 ==========
+      final bool tagMatches = _selectedTagFilter == null ||
+          _selectedTagFilter!.isEmpty ||
+          prediction.tag == _selectedTagFilter;
+      // 解释：如果筛选标签为空(null或空字符串)，则匹配所有预言。
+      // 否则，只匹配标签完全相等的预言。
+      // ===========================================
+
+      return statusMatches && keywordMatches && tagMatches;
     }).toList();
   }
 
@@ -112,7 +125,9 @@ class _HomePageState extends State<HomePage> {
     setState(() {
       _searchKeyword = '';
       _selectedStatus = 'all';
+      _selectedTagFilter = null; // 新增：重置标签筛选
       _showSearchBar = false;
+      _showAllTags = false; // 重置标签展开状态
       _searchController.text = ''; // 清空搜索框
     });
   }
@@ -130,6 +145,38 @@ class _HomePageState extends State<HomePage> {
       _searchKeyword = '';
       _searchController.clear();
     });
+  }
+
+  // ========== V0.5 新增：标签筛选相关方法 ==========
+
+  /// 获取所有预言中使用过的、不重复的标签列表
+  List<String> get _allUniqueTags {
+    Set<String> tags = {};
+    for (var p in _predictions) {
+      if (p.tag != null && p.tag!.isNotEmpty) {
+        tags.add(p.tag!);
+      }
+    }
+    return tags.toList()..sort();
+  }
+
+  /// 构建标签筛选芯片
+  Widget _buildTagChip(String? tag, String label) {
+    final bool isSelected = _selectedTagFilter == tag;
+    return ChoiceChip(
+      label: Text(label),
+      selected: isSelected,
+      onSelected: (selected) {
+        setState(() {
+          _selectedTagFilter = selected ? tag : null;
+        });
+      },
+      selectedColor: Colors.blue,
+      backgroundColor: Colors.grey.shade200,
+      labelStyle: TextStyle(
+        color: isSelected ? Colors.white : Colors.grey.shade700,
+      ),
+    );
   }
 
   // ============================================
@@ -273,6 +320,12 @@ class _HomePageState extends State<HomePage> {
 
   /// 构建筛选器区域
   Widget _buildFilterSection() {
+    // 准备所有标签芯片组件，包括“全部标签”
+    final allTagChips = [
+      _buildTagChip(null, '全部标签'),
+      ..._allUniqueTags.map((tag) => _buildTagChip(tag, tag)).toList(),
+    ];
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Column(
@@ -290,7 +343,7 @@ class _HomePageState extends State<HomePage> {
                   fontWeight: FontWeight.w500,
                 ),
               ),
-              if (_searchKeyword.isNotEmpty || _selectedStatus != 'all')
+              if (_searchKeyword.isNotEmpty || _selectedStatus != 'all' || _selectedTagFilter != null)
                 TextButton(
                   onPressed: _resetFilters,
                   child: const Text(
@@ -320,6 +373,74 @@ class _HomePageState extends State<HomePage> {
               ],
             ),
           ),
+
+          // ========== V0.5 新增：智能标签筛选器（可展开/收起）==========
+          if (_allUniqueTags.isNotEmpty) // 只在有标签时显示标签筛选器
+            Padding(
+              padding: const EdgeInsets.only(top: 12.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    '按标签筛选',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  // 使用 LayoutBuilder 获取当前可用宽度
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      // 估算每个标签芯片的宽度（包括间距）
+                      const estimatedChipWidth = 80.0;
+                      const horizontalSpacing = 8.0;
+                      // 计算一行大约能放多少个标签
+                      final chipsPerRow = (constraints.maxWidth / (estimatedChipWidth + horizontalSpacing)).floor();
+                      // 设置默认最大显示行数（例如2行）
+                      const defaultMaxRows = 2;
+                      final maxVisibleChips = chipsPerRow * defaultMaxRows;
+
+                      // 判断是否需要“展开/收起”功能
+                      final shouldShowExpansion = allTagChips.length > maxVisibleChips;
+
+                      return Column(
+                        children: [
+                          // 标签芯片区域
+                          Wrap(
+                            spacing: horizontalSpacing,
+                            runSpacing: 8,
+                            children: _showAllTags
+                                ? allTagChips // 展开状态：显示全部
+                                : allTagChips.take(maxVisibleChips).toList(), // 收起状态：只显示前N个
+                          ),
+                          // 展开/收起按钮
+                          if (shouldShowExpansion)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8.0),
+                              child: Center(
+                                child: TextButton(
+                                  onPressed: () {
+                                    setState(() {
+                                      _showAllTags = !_showAllTags;
+                                    });
+                                  },
+                                  child: Text(
+                                    _showAllTags ? '收起标签' : '查看更多标签...',
+                                    style: const TextStyle(fontSize: 12),
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+          // ========================================================
 
           // 搜索结果统计
           if (_searchKeyword.isNotEmpty)
@@ -369,7 +490,7 @@ class _HomePageState extends State<HomePage> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          if (_searchKeyword.isNotEmpty || _selectedStatus != 'all')
+          if (_searchKeyword.isNotEmpty || _selectedStatus != 'all' || _selectedTagFilter != null)
             Icon(Icons.search_off, size: 64, color: Colors.grey.shade300)
           else
             Icon(Icons.auto_awesome, size: 64, color: Colors.grey.shade300),
@@ -381,7 +502,9 @@ class _HomePageState extends State<HomePage> {
                 ? '没有找到包含"$_searchKeyword"的预言'
                 : (_selectedStatus != 'all'
                     ? '没有状态为"$_selectedStatusText"的预言'
-                    : '还没有任何预言'),
+                    : (_selectedTagFilter != null
+                        ? '没有标签为"$_selectedTagFilter"的预言'
+                        : '还没有任何预言')),
             style: const TextStyle(fontSize: 18),
             textAlign: TextAlign.center,
           ),
@@ -389,14 +512,14 @@ class _HomePageState extends State<HomePage> {
           const SizedBox(height: 8),
 
           Text(
-            _searchKeyword.isNotEmpty || _selectedStatus != 'all'
+            _searchKeyword.isNotEmpty || _selectedStatus != 'all' || _selectedTagFilter != null
                 ? '尝试使用其他关键词，或点击"重置"查看所有预言'
                 : '点击下方按钮创建第一个预言吧！',
             style: const TextStyle(color: Colors.grey),
             textAlign: TextAlign.center,
           ),
 
-          if (_searchKeyword.isNotEmpty || _selectedStatus != 'all')
+          if (_searchKeyword.isNotEmpty || _selectedStatus != 'all' || _selectedTagFilter != null)
             Padding(
               padding: const EdgeInsets.only(top: 16),
               child: OutlinedButton(

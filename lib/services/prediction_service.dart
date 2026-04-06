@@ -15,13 +15,10 @@ class PredictionService {
     return List.from(_predictions);
   }
 
-  static Future<void> addPrediction(String content, DateTime dueDate) async {
+  static Future<void> addPrediction(String content, DateTime dueDate, {String? tag}) async {
   final now = DateTime.now();
+  String initialStatus = 'pending';
   
-  // 计算正确的初始状态
-  String initialStatus = 'pending'; // 默认待验证
-  
-  // 如果到期时间已经过去，应该直接进入"待裁决"状态
   if (dueDate.isBefore(now) || dueDate.isAtSameMomentAs(now)) {
     initialStatus = 'judging';
   }
@@ -30,11 +27,13 @@ class PredictionService {
     id: DateTime.now().millisecondsSinceEpoch.toString(),
     content: content,
     dueDate: dueDate,
-    status: initialStatus, // 使用计算出的状态
+    status: initialStatus,
+    tag: tag // 将可选的标签传递给Prediction构造函数
   );
   
   _predictions.insert(0, newPrediction);
   await _saveToStorage();
+  print('💾 已保存新预言，标签: ${tag ?? "无"}');
 }
 
   static Future<void> judgePrediction(String id, bool isSuccess) async {
