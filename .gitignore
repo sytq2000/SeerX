@@ -54,3 +54,4 @@ Thumbs.db
 # 缓存
 *.log
 *.lock
+.env
