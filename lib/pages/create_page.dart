@@ -1,4 +1,8 @@
-// lib/pages/create_page.dart
+// create_page.dart
+// 版本: V0.6.3
+// 创建日期: 2026-04-10
+// 修改日期: 2026-04-10
+// 修改目的: 修复调用PredictionService.addPrediction时的参数错误
 import 'package:flutter/material.dart';
 import '../services/prediction_service.dart';
 
@@ -10,15 +14,16 @@ class CreatePage extends StatefulWidget {
 }
 
 class _CreatePageState extends State<CreatePage> {
+  final TextEditingController _titleController = TextEditingController();
   final TextEditingController _contentController = TextEditingController();
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   DateTime _selectedDate = DateTime.now().add(const Duration(days: 7));
-
-  // ========== V0.5 Day2 新增：标签状态 ==========
-  String _selectedTag = ''; // 存储用户选择的标签，默认为空字符串
-  final List<String> _suggestedTags = [
+  
+  // 标签状态
+  String? _selectedCategory;
+  final List<String> _categories = [
     '工作', '生活', '学习', '健康', '财务', '娱乐', '其他'
-  ]; // 预设的常用标签建议
-  // ============================================
+  ];
   
   bool _isCreating = false;
   
@@ -36,9 +41,23 @@ class _CreatePageState extends State<CreatePage> {
     }
   }
   
-  // ========== 修改后的提交方法 ==========
+  // 提交预言的方法
   Future<void> _submitPrediction() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+    
+    _formKey.currentState!.save();
+    
+    final title = _titleController.text.trim();
     final content = _contentController.text.trim();
+    
+    if (title.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('请输入预言标题')),
+      );
+      return;
+    }
     
     if (content.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -52,11 +71,12 @@ class _CreatePageState extends State<CreatePage> {
     });
     
     try {
-      // 调用服务层方法，传入标签
+      // 调用服务层方法，传入所有必需参数
       await PredictionService.addPrediction(
-        content, 
-        _selectedDate,
-        tag: _selectedTag.isEmpty ? null : _selectedTag, // 传入标签，空字符串转为null
+        title: title,
+        content: content,
+        dueDate: _selectedDate,
+        tag: _selectedCategory ?? 'general',
       );
       
       // 返回主页并通知刷新
@@ -80,7 +100,6 @@ class _CreatePageState extends State<CreatePage> {
       }
     }
   }
-  // ====================================
   
   @override
   Widget build(BuildContext context) {
@@ -95,155 +114,177 @@ class _CreatePageState extends State<CreatePage> {
       
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 标题
-            const Text(
-              '写下你的预言',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            
-            const SizedBox(height: 8),
-            
-            const Text(
-              '清晰地描述你预测会发生的事情',
-              style: TextStyle(color: Colors.grey),
-            ),
-            
-            const SizedBox(height: 24),
-            
-            // 内容输入框
-            TextField(
-              controller: _contentController,
-              maxLines: 5,
-              decoration: const InputDecoration(
-                hintText: '例如：我预测明天会下雨\n我预测上证指数4月1日会到3400点',
-                border: OutlineInputBorder(),
-                contentPadding: EdgeInsets.all(12),
-              ),
-            ),
-            
-            const SizedBox(height: 24),
-            
-            // 日期选择
-            const Text(
-              '预言到期时间',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            
-            const SizedBox(height: 8),
-            
-            InkWell(
-              onTap: () => _selectDate(context),
-              borderRadius: BorderRadius.circular(8),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey.shade300),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      '${_selectedDate.year}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}',
-                      style: const TextStyle(fontSize: 16),
-                    ),
-                    const Icon(Icons.calendar_today, color: Colors.grey),
-                  ],
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 标题
+              const Text(
+                '写下你的预言',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
-            ),
-            
-            const SizedBox(height: 8),
-            
-            const Text(
-              '选择验证这个预言是否实现的日期',
-              style: TextStyle(color: Colors.grey, fontSize: 12),
-            ),
-            
-            // ========== V0.5 Day2 新增：标签选择区域 ==========
-            const SizedBox(height: 24),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  '选择标签（可选）',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+              
+              const SizedBox(height: 8),
+              
+              const Text(
+                '清晰地描述你预测会发生的事情',
+                style: TextStyle(color: Colors.grey),
+              ),
+              
+              const SizedBox(height: 24),
+              
+              // 预言标题输入框
+              TextFormField(
+                controller: _titleController,
+                maxLines: 1,
+                decoration: const InputDecoration(
+                  labelText: '预言标题',
+                  hintText: '例如：明天下雨',
+                  border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.all(12),
                 ),
-                const SizedBox(height: 8),
-                // 标签建议列表
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: _suggestedTags.map((tag) {
-                    return ChoiceChip(
-                      label: Text(tag),
-                      selected: _selectedTag == tag,
-                      onSelected: (selected) {
-                        setState(() {
-                          _selectedTag = selected ? tag : ''; // 点击已选中的标签可取消
-                        });
-                      },
-                    );
-                  }).toList(),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return '请输入预言标题';
+                  }
+                  return null;
+                },
+              ),
+              
+              const SizedBox(height: 16),
+              
+              // 内容输入框
+              TextFormField(
+                controller: _contentController,
+                maxLines: 5,
+                decoration: const InputDecoration(
+                  labelText: '预言详情',
+                  hintText: '详细描述你的预言，例如：\n我预测明天会下雨\n我预测上证指数4月1日会到3400点',
+                  border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.all(12),
                 ),
-                const SizedBox(height: 8),
-                // 自定义标签输入（可选功能，如果时间充裕）
-                TextField(
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedTag = value; // 允许用户输入自定义标签
-                    });
-                  },
-                  decoration: const InputDecoration(
-                    hintText: '或输入自定义标签...',
-                    border: OutlineInputBorder(),
-                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return '请输入预言内容';
+                  }
+                  return null;
+                },
+              ),
+              
+              const SizedBox(height: 24),
+              
+              // 日期选择
+              const Text(
+                '预言到期时间',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
                 ),
-              ],
-            ),
-            // ============================================
-            
-            const SizedBox(height: 40),
-            
-            // 提交按钮
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton(
-                onPressed: _isCreating ? null : _submitPrediction,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue,
-                  shape: RoundedRectangleBorder(
+              ),
+              
+              const SizedBox(height: 8),
+              
+              InkWell(
+                onTap: () => _selectDate(context),
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey.shade300),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                ),
-                child: _isCreating
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2,
-                        ),
-                      )
-                    : const Text(
-                        '发布预言',
-                        style: TextStyle(fontSize: 16),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        '${_selectedDate.year}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}',
+                        style: const TextStyle(fontSize: 16),
                       ),
+                      const Icon(Icons.calendar_today, color: Colors.grey),
+                    ],
+                  ),
+                ),
               ),
-            ),
-          ],
+              
+              const SizedBox(height: 8),
+              
+              const Text(
+                '选择验证这个预言是否实现的日期',
+                style: TextStyle(color: Colors.grey, fontSize: 12),
+              ),
+              
+              // 标签选择区域
+              const SizedBox(height: 24),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    '选择分类（可选）',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                  ),
+                  const SizedBox(height: 8),
+                  
+                  // 分类标签列表
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _categories.map((category) {
+                      return ChoiceChip(
+                        label: Text(category),
+                        selected: _selectedCategory == category,
+                        onSelected: (selected) {
+                          setState(() {
+                            _selectedCategory = selected ? category : null;
+                          });
+                        },
+                      );
+                    }).toList(),
+                  ),
+                  
+                  const SizedBox(height: 8),
+                  const Text(
+                    '选择一个分类可以帮助你更好地组织预言',
+                    style: TextStyle(color: Colors.grey, fontSize: 12),
+                  ),
+                ],
+              ),
+              
+              const SizedBox(height: 40),
+              
+              // 提交按钮
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: _isCreating ? null : _submitPrediction,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: _isCreating
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : const Text(
+                          '发布预言',
+                          style: TextStyle(fontSize: 16),
+                        ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

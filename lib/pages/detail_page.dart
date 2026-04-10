@@ -1,4 +1,7 @@
-// lib/pages/detail_page.dart
+// detail_page.dart
+// 版本: V0.6.3
+// 修改日期: 2026-04-10
+// 修改目的: 修复状态显示和裁决逻辑
 import 'package:flutter/material.dart';
 import '../models/prediction.dart';
 import '../services/prediction_service.dart';
@@ -15,6 +18,7 @@ class DetailPage extends StatefulWidget {
 
 class _DetailPageState extends State<DetailPage> {
   Prediction? _prediction;
+  bool _isLoading = false;
   
   @override
   void initState() {
@@ -22,51 +26,66 @@ class _DetailPageState extends State<DetailPage> {
     _loadPrediction();
   }
   
-  void _loadPrediction() {
-  setState(() {
-    _prediction = PredictionService.getPredictionById(widget.predictionId);
-  });
-  
-  // 如果找到了预言，检查是否需要更新状态
-  if (_prediction != null) {
-    _checkAndUpdatePredictionStatus();
-  }
-}
-
-void _checkAndUpdatePredictionStatus() {
-  final now = DateTime.now();
-  final prediction = _prediction!;
-  
-  // 如果预言是"待验证"状态，但到期时间已经到了
-  if (prediction.status == 'pending' && 
-      (prediction.dueDate.isBefore(now) || prediction.dueDate.isAtSameMomentAs(now))) {
-    
-    // 更新状态为"待裁决"
-    PredictionService.judgePrediction(prediction.id, false); // 这里传false，因为我们只是更新状态，不是裁决
-    
-    // 重新加载预言
-    _loadPrediction();
-  }
-}
-  
-void _judgePrediction(bool isSuccess) {
-  if (_prediction != null) {
-    // 更新数据
-    PredictionService.judgePrediction(_prediction!.id, isSuccess);
-    
-    // 立即刷新当前页面的显示
+  Future<void> _loadPrediction() async {
     setState(() {
-      _prediction = PredictionService.getPredictionById(widget.predictionId);
+      _isLoading = true;
     });
     
-    // 等待0.8秒，让用户看到状态已更新
-    Future.delayed(const Duration(milliseconds: 800), () {
+    try {
+      final prediction = await PredictionService.getPredictionById(widget.predictionId);
+      
       if (mounted) {
+        setState(() {
+          _prediction = prediction;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _judgePrediction(bool isSuccess) async {
+    if (_prediction == null) return;
+    
+    setState(() {
+      _isLoading = true;
+    });
+    
+    try {
+      // 使用新的judge方法
+      await PredictionService.judgePrediction(_prediction!.id, isSuccess);
+      
+      // 重新加载预言
+      if (mounted) {
+        await _loadPrediction();
+      }
+      
+      // 等待0.5秒，让用户看到状态已更新
+      await Future.delayed(const Duration(milliseconds: 500));
+      
+      if (mounted) {
+        // 返回true表示已裁决，触发列表刷新
         Navigator.pop(context, true);
       }
-    });
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('裁决失败: $e'),
+            backgroundColor: Colors.red,
+          )
+        );
+      }
+    }
   }
-}
   
   String _formatDateTime(DateTime date) {
     return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
@@ -74,23 +93,6 @@ void _judgePrediction(bool isSuccess) {
   
   @override
   Widget build(BuildContext context) {
-    if (_prediction == null) {
-      return Scaffold(
-        appBar: AppBar(
-          title: const Text('预言详情'),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () => Navigator.pop(context),
-          ),
-        ),
-        body: const Center(
-          child: Text('预言不存在'),
-        ),
-      );
-    }
-    
-    final prediction = _prediction!;
-    
     return Scaffold(
       appBar: AppBar(
         title: const Text('预言详情'),
@@ -100,28 +102,75 @@ void _judgePrediction(bool isSuccess) {
         ),
       ),
       
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 状态徽章
-            StatusBadge(status: prediction.status),
-            
-            const SizedBox(height: 24),
-            
-            // 预言内容
-            const Text(
-              '预言内容',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-                color: Colors.grey,
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _prediction == null
+              ? const Center(child: Text('预言不存在'))
+              : _buildContent(_prediction!),
+    );
+  }
+  
+  Widget _buildContent(Prediction prediction) {
+    // 使用Prediction的计算状态
+    final currentStatus = prediction.status;
+    final canJudge = currentStatus == 'judging';
+    final isJudged = currentStatus == 'successful' || currentStatus == 'failed';
+    
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 状态徽章 - 使用Prediction的statusText
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: Color(prediction.statusColor).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: Color(prediction.statusColor),
+                width: 1,
               ),
             ),
-            
-            const SizedBox(height: 8),
-            
+            child: Text(
+              prediction.statusText,
+              style: TextStyle(
+                color: Color(prediction.statusColor),
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          
+          const SizedBox(height: 24),
+          
+          // 预言内容
+          const Text(
+            '预言内容',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+              color: Colors.grey,
+            ),
+          ),
+          
+          const SizedBox(height: 8),
+          
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade50,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              prediction.title,
+              style: const TextStyle(fontSize: 18, height: 1.5),
+            ),
+          ),
+          
+          if (prediction.description.isNotEmpty) ...[
+            const SizedBox(height: 12),
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(16),
@@ -130,66 +179,67 @@ void _judgePrediction(bool isSuccess) {
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
-                prediction.content,
-                style: const TextStyle(fontSize: 18, height: 1.5),
+                prediction.description,
+                style: const TextStyle(fontSize: 16, height: 1.5),
               ),
             ),
-
-            // ========== V0.5 新增：标签显示 ==========
-            if (prediction.tag != null && prediction.tag!.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(top: 12.0),
-                child: Wrap(
-                  children: [
-                    Chip(
-                      label: Text(
-                        prediction.tag!,
-                        style: const TextStyle(fontSize: 14, color: Colors.white),
-                      ),
-                      backgroundColor: Colors.blue,
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    ),
-                  ],
-                ),
-              ),
-            // =======================================
-            
-            const SizedBox(height: 24),
-            
-            // 详细信息
-            const Text(
-              '详细信息',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-                color: Colors.grey,
-              ),
-            ),
-            
-            const SizedBox(height: 12),
-            
-            _buildDetailItem('创建时间', _formatDateTime(prediction.createdAt)),
-            _buildDetailItem('到期时间', _formatDateTime(prediction.dueDate)),
-            
-            if (prediction.judgedAt != null)
-              _buildDetailItem('裁决时间', _formatDateTime(prediction.judgedAt!)),
-            
-            if (prediction.isSuccess != null)
-              _buildDetailItem(
-                '裁决结果',
-                prediction.isSuccess! ? '预言成功 ✅' : '预言失败 ❌',
-              ),
-            
-            const SizedBox(height: 40),
-            
-            // 裁决区域（仅当待裁决状态时显示）
-            if (prediction.status == 'judging') _buildJudgementSection(),
-            
-            // 结果展示区域（已裁决时显示）
-            if (prediction.status == 'success' || prediction.status == 'failure')
-              _buildResultSection(prediction),
           ],
-        ),
+          
+          // 标签显示
+          if (prediction.tags.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 12.0),
+              child: Wrap(
+                spacing: 8,
+                children: prediction.tags.map((tag) {
+                  return Chip(
+                    label: Text(
+                      tag,
+                      style: const TextStyle(fontSize: 14, color: Colors.white),
+                    ),
+                    backgroundColor: Colors.blue,
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  );
+                }).toList(),
+              ),
+            ),
+          
+          const SizedBox(height: 24),
+          
+          // 详细信息
+          const Text(
+            '详细信息',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+              color: Colors.grey,
+            ),
+          ),
+          
+          const SizedBox(height: 12),
+          
+          _buildDetailItem('创建时间', _formatDateTime(prediction.createdAt)),
+          _buildDetailItem('预言时间', _formatDateTime(prediction.predictionDate)),
+          _buildDetailItem('验证时间', _formatDateTime(prediction.verificationDate)),
+          
+          if (prediction.judgedAt != null)
+            _buildDetailItem('裁决时间', _formatDateTime(prediction.judgedAt!)),
+          
+          if (prediction.isSuccess != null)
+            _buildDetailItem(
+              '裁决结果',
+              prediction.isSuccess! ? '预言成功 ✅' : '预言失败 ❌',
+            ),
+          
+          const SizedBox(height: 40),
+          
+          // 裁决区域（仅当待裁决状态时显示）
+          if (canJudge) _buildJudgementSection(),
+          
+          // 结果展示区域（已裁决时显示）
+          if (isJudged)
+            _buildResultSection(prediction),
+        ],
       ),
     );
   }
@@ -257,7 +307,7 @@ void _judgePrediction(bool isSuccess) {
             children: [
               Expanded(
                 child: ElevatedButton(
-                  onPressed: () => _judgePrediction(true),
+                  onPressed: _isLoading ? null : () => _judgePrediction(true),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green,
                     padding: const EdgeInsets.symmetric(vertical: 16),
@@ -265,14 +315,23 @@ void _judgePrediction(bool isSuccess) {
                       borderRadius: BorderRadius.circular(8),
                     ),
                   ),
-                  child: const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.check, size: 20),
-                      SizedBox(width: 8),
-                      Text('预言成功'),
-                    ],
-                  ),
+                  child: _isLoading
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation(Colors.white),
+                          ),
+                        )
+                      : const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.check, size: 20),
+                            SizedBox(width: 8),
+                            Text('预言成功'),
+                          ],
+                        ),
                 ),
               ),
               
@@ -280,7 +339,7 @@ void _judgePrediction(bool isSuccess) {
               
               Expanded(
                 child: ElevatedButton(
-                  onPressed: () => _judgePrediction(false),
+                  onPressed: _isLoading ? null : () => _judgePrediction(false),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.red,
                     padding: const EdgeInsets.symmetric(vertical: 16),
@@ -288,14 +347,23 @@ void _judgePrediction(bool isSuccess) {
                       borderRadius: BorderRadius.circular(8),
                     ),
                   ),
-                  child: const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.close, size: 20),
-                      SizedBox(width: 8),
-                      Text('预言失败'),
-                    ],
-                  ),
+                  child: _isLoading
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation(Colors.white),
+                          ),
+                        )
+                      : const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.close, size: 20),
+                            SizedBox(width: 8),
+                            Text('预言失败'),
+                          ],
+                        ),
                 ),
               ),
             ],
@@ -311,9 +379,6 @@ void _judgePrediction(bool isSuccess) {
       ),
     );
   }
-  
-
-
 
   Widget _buildResultSection(Prediction prediction) {
     final isSuccess = prediction.isSuccess == true;

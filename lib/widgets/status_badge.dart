@@ -6,22 +6,23 @@ class StatusBadge extends StatelessWidget {
   
   const StatusBadge({super.key, required this.status});
   
+
+
   Color _getStatusColor() {
-    switch (status) {
-      case 'pending':
-        return Colors.grey;
-      case 'judging':
-        return Colors.orange;
-      case 'success':
-        return Colors.green;
-      case 'failure':
-        return Colors.red;
-      case 'judged':  // 添加对'judged'的处理
-        return Colors.blue; // 或者根据实际情况返回颜色
-      default:
-        return Colors.grey; // 默认颜色
-    }
+  switch (status) {
+    case 'pending':
+      return Colors.grey; // 灰色
+    case 'judging':
+      return Colors.orange;
+    case 'successful':
+      return Colors.green; // 绿色
+    case 'failed':
+      return Colors.red;
+    default:
+      return Colors.grey;
   }
+}
+  
   
   String _getStatusText() {
     switch (status) {
@@ -29,14 +30,12 @@ class StatusBadge extends StatelessWidget {
         return '待验证';
       case 'judging':
         return '待裁决';
-      case 'success':
+      case 'successful':  // 修复：改为'successful'
         return '预言成功';
-      case 'failure':
+      case 'failed':      // 修复：改为'failed'
         return '预言失败';
-      case 'judged':  // 添加对'judged'的处理
-        return '已裁决'; // 或者根据实际情况返回文本
       default:
-        return '未知'; // 你截图中显示的是这个
+        return '未知';
     }
   }
   
@@ -45,9 +44,9 @@ class StatusBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: _getStatusColor().withValues(alpha: 0.1),
+        color: _getStatusColor().withOpacity(0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: _getStatusColor().withValues(alpha: 0.3)),
+        border: Border.all(color: _getStatusColor().withOpacity(0.3)),
       ),
       child: Text(
         _getStatusText(),

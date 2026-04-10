@@ -1,7 +1,8 @@
 // lib/widgets/prediction_card.dart
 import 'package:flutter/material.dart';
 import '../models/prediction.dart';
-import 'status_badge.dart';
+// 注释掉旧的StatusBadge导入
+// import 'status_badge.dart';
 
 class PredictionCard extends StatelessWidget {
   final Prediction prediction;
@@ -33,7 +34,29 @@ class PredictionCard extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  StatusBadge(status: prediction.status),
+                  // 使用Prediction的statusText和statusColor
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Color(prediction.statusColor).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Color(prediction.statusColor),
+                        width: 1,
+                      ),
+                    ),
+                    child: Text(
+                      prediction.statusText,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: Color(prediction.statusColor),
+                      ),
+                    ),
+                  ),
                   Text(
                     '到期: ${_formatDate(prediction.dueDate)}',
                     style: const TextStyle(

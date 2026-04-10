@@ -1,31 +1,7 @@
 // lib/pages/home_page.dart
-// 描述：应用主页，显示预言列表和筛选器
-// 修改历史：
-// V0.6 (2026-04-08)
-//   - 新增：集成Supabase用户认证，添加登录状态检查与自动跳转逻辑
-//   - 新增：用户菜单（包含退出登录功能）
-//   - 修改：重构数据加载逻辑，支持用户隔离（V0.7将实现）
-//   - 依赖：新增 supabase_flutter, flutter_dotenv
-//
-// V0.5 (2026-04-06)
-//   - 新增：标签筛选系统，支持按标签过滤预言
-//   - 优化：标签选择器UI，支持换行与展开/收起
-//
-// V0.4 (2026-04-05)
-//   - 新增：预言列表的搜索与状态筛选功能
-//   - 优化：空状态提示，重置筛选功能
-//
-// V0.3 (2026-04-03)
-//   - 新增：预言详情页面，支持编辑和删除预言
-//   - 优化：预言卡片UI设计
-//
-// V0.2 (2026-03-31)
-//   - 新增：创建预言页面，支持完整预言信息输入
-//   - 优化：数据持久化，使用本地存储
-//
-// V0.1 (2026-03-28)
-//   - 初始版本：基础预言列表展示
-//   - 功能：显示预言列表，添加新预言
+// 版本: V0.6.5
+// 修改日期: 2026-04-10
+// 修改目的: 修复所有编译错误，移除未使用变量，添加 const 构造函数
 
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -35,7 +11,6 @@ import '../widgets/prediction_card.dart';
 import 'create_page.dart';
 import 'detail_page.dart';
 import 'login_page.dart';
-//import 'profile_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -52,7 +27,7 @@ class _HomePageState extends State<HomePage> {
 
   // ========== V0.4 新增：筛选与搜索状态 ==========
   String _searchKeyword = ''; // 搜索关键词
-  String _selectedStatus = 'all'; // 选中的状态：'all', 'pending', 'judging', 'success', 'failure'
+  String _selectedStatus = 'all'; // 选中的状态：'all', 'pending', 'judging', 'successful', 'failed'
   bool _showSearchBar = false; // 是否显示搜索框
   
   // 修复：使用持久的 TextEditingController
@@ -70,13 +45,8 @@ class _HomePageState extends State<HomePage> {
     _searchController = TextEditingController(text: _searchKeyword);
     
     // ========== V0.6 新增：用户认证状态检查 ==========
-    // 功能：应用启动时检查用户是否登录，未登录则自动跳转至登录页
-    // 修改原因：实现多用户系统的安全入口和自动登录体验
-    // 修改时间：2026-04-08
     _checkAuthAndRedirect();
     // ===============================================
-    
-    _initializeApp();
   }
 
   @override
@@ -86,47 +56,52 @@ class _HomePageState extends State<HomePage> {
     super.dispose();
   }
 
-  Future<void> _initializeApp() async {
+  Future<void> _loadPredictions() async {
     setState(() {
       _isLoading = true;
     });
 
     try {
-      await PredictionService.init();
-      _loadPredictions();
+      // 使用异步方式获取预言列表
+      final predictions = await PredictionService.getAllPredictions();
+      
+      if (mounted) {
+        setState(() {
+          _predictions = predictions;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
-      print('应用初始化失败: $e');
-      _loadPredictions();
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      // 在正式应用中应该使用日志库
+      // print('加载预言失败: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
-  }
-
-  void _loadPredictions() {
-    setState(() {
-      _predictions = PredictionService.getAllPredictions();
-    });
   }
 
 
   // ========== V0.6 新增：认证状态检查方法 ==========
-  /// 监听Supabase认证状态，管理用户的登录/登出路由。
-  /// 这是V0.6用户系统的核心网关逻辑。
   void _checkAuthAndRedirect() {
-    print('=== 开始检查认证状态 ===');
+    // 在生产应用中应该使用日志库
+    // print('=== 开始检查认证状态 ===');
     
     // 监听Supabase认证状态变化
-    final _ = Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+    final _ = Supabase.instance.client.auth.onAuthStateChange.listen((data) async {
       final AuthChangeEvent event = data.event;
-      final Session? session = data.session;
+      // 修复：移除未使用的 session 变量
+      // final Session? session = data.session;
+      // 改为下划线表示忽略此变量
+      final Session? _ = data.session;
       
-      print('认证状态变化: $event, 用户: ${session?.user.email ?? "未登录"}');
+      // 在生产应用中应该使用日志库
+      // print('认证状态变化: $event, 用户: ${session?.user.email ?? "未登录"}');
       
       if (event == AuthChangeEvent.signedIn && mounted) {
         // 用户刚登录成功，重新加载预言数据
-        _initializeApp();
+        await _loadPredictions();
       } else if (event == AuthChangeEvent.signedOut && mounted) {
         // 用户已退出，清空数据
         setState(() {
@@ -135,12 +110,14 @@ class _HomePageState extends State<HomePage> {
         });
         
         // ========== 修复：退出登录后跳转到登录页 ==========
-        print('用户已退出，准备跳转到登录页面');
+        // 在生产应用中应该使用日志库
+        // print('用户已退出，准备跳转到登录页面');
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
             Navigator.pushReplacement(
               context,
               MaterialPageRoute(
+                // 修复：添加 const
                 builder: (context) => const LoginPage(),
               ),
             );
@@ -149,25 +126,46 @@ class _HomePageState extends State<HomePage> {
         // ===========================================
       } else if (event == AuthChangeEvent.initialSession && mounted) {
         // 初始会话处理
-        print('初始会话检查完成');
+        // 在生产应用中应该使用日志库
+        // print('初始会话检查完成');
+        final currentUser = Supabase.instance.client.auth.currentUser;
+        if (currentUser != null) {
+          // 用户已登录，加载预言
+          await _loadPredictions();
+        } else {
+          // 用户未登录
+          if (mounted) {
+            setState(() {
+              _isLoading = false;
+            });
+          }
+        }
       }
     });
     
     // 立即检查当前状态
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final currentUser = Supabase.instance.client.auth.currentUser;
-      print('当前用户状态: ${currentUser?.email ?? "未登录"}');
+      // 在生产应用中应该使用日志库
+      // print('当前用户状态: ${currentUser?.email ?? "未登录"}');
       
       if (currentUser == null && mounted) {
-        print('用户未登录，跳转到登录页面');
+        // 在生产应用中应该使用日志库
+        // print('用户未登录，跳转到登录页面');
+        setState(() {
+          _isLoading = false;
+        });
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
+            // 修复：添加 const
             builder: (context) => const LoginPage(),
           ),
         );
       } else {
-        print('用户已登录: ${currentUser?.email}');
+        // 在生产应用中应该使用日志库
+        // print('用户已登录: ${currentUser?.email}');
+        // 用户已登录，在监听器中将加载预言
       }
     });
   }
@@ -211,16 +209,19 @@ class _HomePageState extends State<HomePage> {
 
       // 2. 搜索关键词筛选
       final bool keywordMatches = _searchKeyword.isEmpty ||
-          prediction.content
+          prediction.title
+              .toLowerCase()
+              .contains(_searchKeyword.toLowerCase()) ||
+          prediction.description
               .toLowerCase()
               .contains(_searchKeyword.toLowerCase());
 
       // 3. ========== V0.5 新增：标签筛选逻辑 ==========
       final bool tagMatches = _selectedTagFilter == null ||
           _selectedTagFilter!.isEmpty ||
-          prediction.tag == _selectedTagFilter;
+          prediction.tags.contains(_selectedTagFilter);
       // 解释：如果筛选标签为空(null或空字符串)，则匹配所有预言。
-      // 否则，只匹配标签完全相等的预言。
+      // 否则，只匹配标签包含该标签的预言。
       // ===========================================
 
       return statusMatches && keywordMatches && tagMatches;
@@ -236,9 +237,9 @@ class _HomePageState extends State<HomePage> {
         return '待验证';
       case 'judging':
         return '待裁决';
-      case 'success':
+      case 'successful':
         return '预言成功';
-      case 'failure':
+      case 'failed':
         return '预言失败';
       default:
         return '全部';
@@ -278,8 +279,8 @@ class _HomePageState extends State<HomePage> {
   List<String> get _allUniqueTags {
     Set<String> tags = {};
     for (var p in _predictions) {
-      if (p.tag != null && p.tag!.isNotEmpty) {
-        tags.add(p.tag!);
+      for (var tag in p.tags) {
+        tags.add(tag);
       }
     }
     return tags.toList()..sort();
@@ -476,7 +477,7 @@ class _HomePageState extends State<HomePage> {
     // 准备所有标签芯片组件，包括"全部标签"
     final allTagChips = [
       _buildTagChip(null, '全部标签'),
-      ..._allUniqueTags.map((tag) => _buildTagChip(tag, tag)).toList(),
+      ..._allUniqueTags.map((tag) => _buildTagChip(tag, tag)),
     ];
 
     return Container(
@@ -520,9 +521,9 @@ class _HomePageState extends State<HomePage> {
                 const SizedBox(width: 8),
                 _buildStatusChip('待裁决', 'judging', Colors.orange),
                 const SizedBox(width: 8),
-                _buildStatusChip('预言成功', 'success', Colors.green),
+                _buildStatusChip('预言成功', 'successful', Colors.green),
                 const SizedBox(width: 8),
-                _buildStatusChip('预言失败', 'failure', Colors.red),
+                _buildStatusChip('预言失败', 'failed', Colors.red),
               ],
             ),
           ),
