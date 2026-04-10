@@ -20,12 +20,33 @@ class _ProfilePageState extends State<ProfilePage> {
     _loadStats();
   }
 
-  /// 加载统计数据
-  void _loadStats() {
-    setState(() {
-      _stats = PredictionService.getPredictionStats();
-      _isLoading = false;
-    });
+  /// 加载统计数据 - 修复：改为异步方法
+  Future<void> _loadStats() async {
+    try {
+      // 使用 await 获取异步数据
+      final stats = await PredictionService.getPredictionStats();
+      if (mounted) {
+        setState(() {
+          _stats = stats;  // 现在类型匹配了
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      // 错误处理
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+      // 修复：避免在异步间隙中使用 BuildContext
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('加载统计数据失败: $e')),
+          );
+        }
+      });
+    }
   }
 
   @override
@@ -62,9 +83,9 @@ class _ProfilePageState extends State<ProfilePage> {
     final double successRate = _stats['successRate'] ?? 0.0;
 
     // 用户信息（暂时保持模拟，未来可从 AuthService 获取）
-    final String userName = '预言家小明';
-    final String userEmail = 'seer@example.com';
-    final String joinDate = '2026年3月20日';
+    const String userName = '预言家小明';
+    const String userEmail = 'seer@example.com';
+    const String joinDate = '2026年3月20日';
 
     return Scaffold(
       appBar: AppBar(
@@ -81,10 +102,7 @@ class _ProfilePageState extends State<ProfilePage> {
               setState(() {
                 _isLoading = true;
               });
-              // 短暂延迟后重新加载，让用户看到加载效果
-              Future.delayed(const Duration(milliseconds: 300), () {
-                _loadStats();
-              });
+              _loadStats();  // 直接调用，不需要延迟
             },
             tooltip: '刷新数据',
           ),
@@ -332,6 +350,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 Container(
                   padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(
+                    // 修复：使用 withValues 替换弃用的 withOpacity
                     color: color.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
