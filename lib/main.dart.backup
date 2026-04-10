@@ -1,0 +1,107 @@
+// lib/main.dart
+// 描述：应用入口文件，初始化全局服务和配置
+// 修改历史：
+// V0.6 (2026-04-08) - 小明
+//   - 新增：Supabase初始化与环境变量加载
+//   - 修改：应用入口从LoginPage改为HomePage，实现自动登录路由
+//   - 依赖：新增 flutter_dotenv, supabase_flutter
+//   - 移除：shared_preferences（当前未使用）
+//
+// V0.1 (2026-03-26) - 小明
+//   - 初始版本：基础应用框架
+
+import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'pages/home_page.dart';
+
+// 修改 main.dart 的 main 函数
+void main() async {
+  print('🚀 应用开始启动...');
+  
+  try {
+    WidgetsFlutterBinding.ensureInitialized();
+    print('✅ Flutter 引擎初始化完成');
+    
+    // 1. 加载环境变量
+    print('🔧 开始加载环境变量...');
+    await dotenv.load(fileName: ".env");
+    print('✅ 环境变量加载完成');
+    print('📦 SUPABASE_URL: ${dotenv.env['SUPABASE_URL']}');
+    print('🔑 SUPABASE_ANON_KEY: ${dotenv.env['SUPABASE_ANON_KEY']?.substring(0, 20)}...');
+    
+    // 2. 初始化 Supabase
+    print('🔌 开始初始化 Supabase...');
+    await Supabase.initialize(
+      url: dotenv.env['SUPABASE_URL']!,
+      anonKey: dotenv.env['SUPABASE_ANON_KEY']!,
+    );
+    print('✅ Supabase 初始化完成');
+    
+    // 3. 运行应用
+    print('🎯 启动 Flutter 应用...');
+    runApp(const MyApp());
+  } catch (e, stackTrace) {
+    print('❌ 应用启动失败: $e');
+    print('📋 堆栈跟踪: $stackTrace');
+    
+    // 在浏览器中显示错误信息
+    runApp(MaterialApp(
+      home: Scaffold(
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error, size: 64, color: Colors.red),
+                const SizedBox(height: 20),
+                const Text(
+                  '应用启动失败',
+                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  '错误: $e',
+                  style: const TextStyle(fontSize: 16, color: Colors.red),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  '可能的原因：\n1. 网络连接问题\n2. Supabase 配置错误\n3. 环境变量加载失败',
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ));
+  }
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'SeerX 预言系统',
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
+        useMaterial3: true,  // 启用Material 3
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.white,
+          foregroundColor: Colors.black,
+          elevation: 1,
+        ),
+        visualDensity: VisualDensity.adaptivePlatformDensity,
+      ),
+      // ========== V0.6 修改：首页入口变更 ==========
+      // 从直接登录页改为首页，由首页负责登录状态路由
+      home: const HomePage(),
+      // ===========================================
+      debugShowCheckedModeBanner: false,
+    );
+  }
+}

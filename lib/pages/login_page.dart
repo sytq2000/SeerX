@@ -4,10 +4,11 @@
 // 修改目的: 修复 flutter_hooks 相关错误，改为使用 StatefulWidget
 
 import 'package:flutter/material.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
 import '../services/auth_service.dart';
 import 'home_page.dart';
 
-class LoginPage extends StatefulWidget {
+class LoginPage extends HookWidget {
   const LoginPage({super.key});
   
   @override
@@ -182,6 +183,129 @@ class _LoginPageState extends State<LoginPage> {
   
   @override
   Widget build(BuildContext context) {
+    final isLoginMode = useState(true);
+    final emailController = useTextEditingController();
+    final passwordController = useTextEditingController();
+    final confirmPasswordController = useTextEditingController();
+    final isLoading = useState(false);
+    final errorMessage = useState<String?>(null);
+    
+    Future<void> submit() async {
+      if (isLoading.value) return;
+      
+      final email = emailController.text.trim();
+      final password = passwordController.text.trim();
+      
+      // 使用类方法验证邮箱
+      if (!_isValidEmail(email)) {
+        if (context.mounted) {
+          errorMessage.value = '请输入有效的邮箱地址';
+        }
+        return;
+      }
+      
+      if (email.isEmpty || password.isEmpty) {
+        if (context.mounted) {
+          errorMessage.value = '请输入邮箱和密码';
+        }
+        return;
+      }
+      
+      if (!isLoginMode.value) {
+        final confirmPassword = confirmPasswordController.text.trim();
+        if (password != confirmPassword) {
+          if (context.mounted) {
+            errorMessage.value = '两次输入的密码不一致';
+          }
+          return;
+        }
+        if (password.length < 6) {
+          if (context.mounted) {
+            errorMessage.value = '密码至少需要6位';
+          }
+          return;
+        }
+      }
+      
+      if (context.mounted) {
+        isLoading.value = true;
+        errorMessage.value = null;
+      }
+      
+      try {
+        if (isLoginMode.value) {
+          print('尝试登录: $email');
+          await AuthService.signInWithEmail(
+            email: email,
+            password: password,
+          );
+          print('登录成功');
+        } else {
+          print('尝试注册: $email');
+          await AuthService.signUpWithEmail(
+            email: email,
+            password: password,
+          );
+          print('注册成功');
+        }
+        
+        // 注册/登录成功后，给一点时间让Supabase更新状态
+        await Future.delayed(const Duration(milliseconds: 1000));
+        
+        // 再次检查当前用户
+        final currentUser = AuthService.currentUser;
+        print('操作后当前用户: ${currentUser?.email ?? "未登录"}');
+        
+        if (currentUser == null) {
+          // 如果用户仍然为空，可能是会话没有正确建立
+          throw Exception('登录状态异常，请稍后重试');
+        }
+        
+        // 成功，跳转到首页
+        if (context.mounted) {
+          print('注册/登录成功，跳转到首页');
+          // 使用 pushAndRemoveUntil 确保清除所有路由
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (context) => const HomePage()),
+            (Route<dynamic> route) => false,
+          );
+        }
+      } catch (e) {
+        print('操作失败: $e');
+        
+        String errorMsg = e.toString();
+        
+        // 提供更友好的错误提示
+        if (errorMsg.contains('Email not confirmed')) {
+          errorMsg = '邮箱未确认。请检查您的邮箱并点击确认链接，或联系管理员确认账户。';
+          
+          // 如果是开发环境，添加额外提示
+          if (email.contains('+test@')) {
+            errorMsg += '\n\n提示：+test邮箱自动确认可能未启用，请在Supabase控制台手动确认邮箱。';
+          }
+        } else if (errorMsg.contains('email rate limit exceeded')) {
+          errorMsg = '操作过于频繁，请等待15-30分钟再试。';
+        } else if (errorMsg.contains('Invalid login credentials')) {
+          errorMsg = '邮箱或密码错误';
+        } else if (errorMsg.contains('User already registered')) {
+          errorMsg = '该邮箱已注册，请直接登录';
+        } else if (errorMsg.contains('login state abnormal')) {
+          errorMsg = '登录状态异常，请尝试重新登录';
+        } else {
+          errorMsg = errorMsg.replaceAll('Exception: ', '');
+        }
+        
+        if (context.mounted) {
+          errorMessage.value = errorMsg;
+        }
+      } finally {
+        if (context.mounted) {
+          isLoading.value = false;
+        }
+      }
+    }
+    
     return Scaffold(
       appBar: AppBar(
         title: Text(_isLoginMode ? '登录' : '注册'),
@@ -281,6 +405,39 @@ class _LoginPageState extends State<LoginPage> {
                     fontSize: 14,
                   ),
                 ),
+                child: isLoading.value
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : Text(
+                        isLoginMode.value ? '登录' : '注册',
+                        style: const TextStyle(fontSize: 16),
+                      ),
+              ),
+            ),
+            
+            const SizedBox(height: 20),
+            
+            // 切换模式
+            TextButton(
+              onPressed: isLoading.value
+                  ? null
+                  : () {
+                      isLoginMode.value = !isLoginMode.value;
+                      errorMessage.value = null;
+                      passwordController.clear();
+                      confirmPasswordController.clear();
+                    },
+              child: Text(
+                isLoginMode.value
+                    ? '没有账号？立即注册'
+                    : '已有账号？立即登录',
+                style: const TextStyle(fontSize: 14),
               ),
             
             // 开发提示
