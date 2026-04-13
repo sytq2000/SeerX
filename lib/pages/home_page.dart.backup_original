@@ -1,11 +1,18 @@
 // lib/pages/home_page.dart
+// 版本: V0.7.1
+// 修改日期: 2026-04-10
+// 修改目的: 移除灵光一现功能，专注核心预言功能
+
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/prediction.dart';
 import '../services/prediction_service.dart';
 import '../widgets/prediction_card.dart';
 import 'create_page.dart';
 import 'detail_page.dart';
-import 'profile_page.dart';
+// 注释掉灵光一现页面导入
+// import 'idea_page.dart';
+import 'login_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -22,7 +29,7 @@ class _HomePageState extends State<HomePage> {
 
   // ========== V0.4 新增：筛选与搜索状态 ==========
   String _searchKeyword = ''; // 搜索关键词
-  String _selectedStatus = 'all'; // 选中的状态：'all', 'pending', 'judging', 'success', 'failure'
+  String _selectedStatus = 'all'; // 选中的状态：'all', 'pending', 'judging', 'successful', 'failed'
   bool _showSearchBar = false; // 是否显示搜索框
   
   // 修复：使用持久的 TextEditingController
@@ -39,7 +46,9 @@ class _HomePageState extends State<HomePage> {
     // 初始化搜索控制器
     _searchController = TextEditingController(text: _searchKeyword);
     
-    _initializeApp();
+    // ========== V0.6 新增：用户认证状态检查 ==========
+    _checkAuthAndRedirect();
+    // ===============================================
   }
 
   @override
@@ -49,29 +58,145 @@ class _HomePageState extends State<HomePage> {
     super.dispose();
   }
 
-  Future<void> _initializeApp() async {
+  Future<void> _loadPredictions() async {
     setState(() {
       _isLoading = true;
     });
 
     try {
-      await PredictionService.init();
-      _loadPredictions();
+      // 使用异步方式获取预言列表
+      final predictions = await PredictionService.getAllPredictions();
+      
+      if (mounted) {
+        setState(() {
+          _predictions = predictions;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
-      print('应用初始化失败: $e');
-      _loadPredictions();
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      // 在正式应用中应该使用日志库
+      // print('加载预言失败: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
-  void _loadPredictions() {
-    setState(() {
-      _predictions = PredictionService.getAllPredictions();
+
+  // ========== V0.6 新增：认证状态检查方法 ==========
+  void _checkAuthAndRedirect() {
+    // 在生产应用中应该使用日志库
+    // print('=== 开始检查认证状态 ===');
+    
+    // 监听Supabase认证状态变化
+    final _ = Supabase.instance.client.auth.onAuthStateChange.listen((data) async {
+      final AuthChangeEvent event = data.event;
+      // 修复：移除未使用的 session 变量
+      // final Session? session = data.session;
+      // 改为下划线表示忽略此变量
+      final Session? _ = data.session;
+      
+      // 在生产应用中应该使用日志库
+      // print('认证状态变化: $event, 用户: ${session?.user.email ?? "未登录"}');
+      
+      if (event == AuthChangeEvent.signedIn && mounted) {
+        // 用户刚登录成功，重新加载预言数据
+        await _loadPredictions();
+      } else if (event == AuthChangeEvent.signedOut && mounted) {
+        // 用户已退出，清空数据
+        setState(() {
+          _predictions = [];
+          _isLoading = false;
+        });
+        
+        // ========== 修复：退出登录后跳转到登录页 ==========
+        // 在生产应用中应该使用日志库
+        // print('用户已退出，准备跳转到登录页面');
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                // 修复：添加 const
+                builder: (context) => const LoginPage(),
+              ),
+            );
+          }
+        });
+        // ===========================================
+      } else if (event == AuthChangeEvent.initialSession && mounted) {
+        // 初始会话处理
+        // 在生产应用中应该使用日志库
+        // print('初始会话检查完成');
+        final currentUser = Supabase.instance.client.auth.currentUser;
+        if (currentUser != null) {
+          // 用户已登录，加载预言
+          await _loadPredictions();
+        } else {
+          // 用户未登录
+          if (mounted) {
+            setState(() {
+              _isLoading = false;
+            });
+          }
+        }
+      }
+    });
+    
+    // 立即检查当前状态
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final currentUser = Supabase.instance.client.auth.currentUser;
+      // 在生产应用中应该使用日志库
+      // print('当前用户状态: ${currentUser?.email ?? "未登录"}');
+      
+      if (currentUser == null && mounted) {
+        // 在生产应用中应该使用日志库
+        // print('用户未登录，跳转到登录页面');
+        setState(() {
+          _isLoading = false;
+        });
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            // 修复：添加 const
+            builder: (context) => const LoginPage(),
+          ),
+        );
+      } else {
+        // 在生产应用中应该使用日志库
+        // print('用户已登录: ${currentUser?.email}');
+        // 用户已登录，在监听器中将加载预言
+      }
     });
   }
+  // ===============================================
+
+  // ========== V0.6 新增：退出确认对话框 ==========
+  void _showLogoutDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('确认退出'),
+        content: const Text('确定要退出登录吗？退出后需要重新登录才能访问您的预言。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await Supabase.instance.client.auth.signOut();
+            },
+            child: const Text('退出'),
+          ),
+        ],
+      ),
+    );
+  }
+  // ===========================================
 
   // ========== V0.4 新增：过滤预言列表的方法 ==========
 
@@ -86,16 +211,19 @@ class _HomePageState extends State<HomePage> {
 
       // 2. 搜索关键词筛选
       final bool keywordMatches = _searchKeyword.isEmpty ||
-          prediction.content
+          prediction.title
+              .toLowerCase()
+              .contains(_searchKeyword.toLowerCase()) ||
+          prediction.description
               .toLowerCase()
               .contains(_searchKeyword.toLowerCase());
 
       // 3. ========== V0.5 新增：标签筛选逻辑 ==========
       final bool tagMatches = _selectedTagFilter == null ||
           _selectedTagFilter!.isEmpty ||
-          prediction.tag == _selectedTagFilter;
+          prediction.tags.contains(_selectedTagFilter);
       // 解释：如果筛选标签为空(null或空字符串)，则匹配所有预言。
-      // 否则，只匹配标签完全相等的预言。
+      // 否则，只匹配标签包含该标签的预言。
       // ===========================================
 
       return statusMatches && keywordMatches && tagMatches;
@@ -111,9 +239,9 @@ class _HomePageState extends State<HomePage> {
         return '待验证';
       case 'judging':
         return '待裁决';
-      case 'success':
+      case 'successful':
         return '预言成功';
-      case 'failure':
+      case 'failed':
         return '预言失败';
       default:
         return '全部';
@@ -153,8 +281,8 @@ class _HomePageState extends State<HomePage> {
   List<String> get _allUniqueTags {
     Set<String> tags = {};
     for (var p in _predictions) {
-      if (p.tag != null && p.tag!.isNotEmpty) {
-        tags.add(p.tag!);
+      for (var tag in p.tags) {
+        tags.add(tag);
       }
     }
     return tags.toList()..sort();
@@ -192,6 +320,19 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  // ========== 注释掉灵光一现导航方法 ==========
+  // Future<void> _navigateToIdeaPage() async {
+  //   final result = await Navigator.push(
+  //     context,
+  //     MaterialPageRoute(builder: (context) => const IdeaPage()),
+  //   );
+  // 
+  //   if (result == true) {
+  //     _loadPredictions();
+  //   }
+  // }
+  // =========================================
+
   Future<void> _navigateToDetailPage(String predictionId) async {
     final result = await Navigator.push(
       context,
@@ -224,15 +365,43 @@ class _HomePageState extends State<HomePage> {
             },
             tooltip: '搜索预言',
           ),
-          IconButton(
+          // ========== V0.6 修改：用户菜单替换个人中心按钮 ==========
+          PopupMenuButton<String>(
             icon: const Icon(Icons.person),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const ProfilePage()),
-              );
+            onSelected: (value) {
+              if (value == 'profile') {
+                // 个人中心（V0.7实现）
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('个人中心功能将在V0.7中实现')),
+                );
+              } else if (value == 'logout') {
+                _showLogoutDialog();
+              }
             },
+            itemBuilder: (context) => [
+              const PopupMenuItem<String>(
+                value: 'profile',
+                child: Row(
+                  children: [
+                    Icon(Icons.person, size: 20),
+                    SizedBox(width: 8),
+                    Text('个人中心'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem<String>(
+                value: 'logout',
+                child: Row(
+                  children: [
+                    Icon(Icons.exit_to_app, size: 20),
+                    SizedBox(width: 8),
+                    Text('退出登录'),
+                  ],
+                ),
+              ),
+            ],
           ),
+          // ===================================================
         ],
       ),
       body: _isLoading
@@ -269,9 +438,11 @@ class _HomePageState extends State<HomePage> {
                 ),
               ],
             ),
+      // ========== 修改FloatingActionButton：简化，直接跳转到创建预言 ==========
       floatingActionButton: FloatingActionButton(
         onPressed: _navigateToCreatePage,
         backgroundColor: Colors.blue,
+        tooltip: '创建新预言',
         child: const Icon(Icons.add, size: 28),
       ),
     );
@@ -320,10 +491,10 @@ class _HomePageState extends State<HomePage> {
 
   /// 构建筛选器区域
   Widget _buildFilterSection() {
-    // 准备所有标签芯片组件，包括“全部标签”
+    // 准备所有标签芯片组件，包括"全部标签"
     final allTagChips = [
       _buildTagChip(null, '全部标签'),
-      ..._allUniqueTags.map((tag) => _buildTagChip(tag, tag)).toList(),
+      ..._allUniqueTags.map((tag) => _buildTagChip(tag, tag)),
     ];
 
     return Container(
@@ -367,9 +538,9 @@ class _HomePageState extends State<HomePage> {
                 const SizedBox(width: 8),
                 _buildStatusChip('待裁决', 'judging', Colors.orange),
                 const SizedBox(width: 8),
-                _buildStatusChip('预言成功', 'success', Colors.green),
+                _buildStatusChip('预言成功', 'successful', Colors.green),
                 const SizedBox(width: 8),
-                _buildStatusChip('预言失败', 'failure', Colors.red),
+                _buildStatusChip('预言失败', 'failed', Colors.red),
               ],
             ),
           ),
@@ -402,7 +573,7 @@ class _HomePageState extends State<HomePage> {
                       const defaultMaxRows = 2;
                       final maxVisibleChips = chipsPerRow * defaultMaxRows;
 
-                      // 判断是否需要“展开/收起”功能
+                      // 判断是否需要"展开/收起"功能
                       final shouldShowExpansion = allTagChips.length > maxVisibleChips;
 
                       return Column(
