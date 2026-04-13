@@ -1,7 +1,7 @@
 // lib/pages/home_page.dart
-// 版本: V0.6.5
+// 版本: V0.7.1
 // 修改日期: 2026-04-10
-// 修改目的: 修复所有编译错误，移除未使用变量，添加 const 构造函数
+// 修改目的: 移除灵光一现功能，专注核心预言功能
 
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -10,6 +10,8 @@ import '../services/prediction_service.dart';
 import '../widgets/prediction_card.dart';
 import 'create_page.dart';
 import 'detail_page.dart';
+// 注释掉灵光一现页面导入
+// import 'idea_page.dart';
 import 'login_page.dart';
 
 class HomePage extends StatefulWidget {
@@ -196,94 +198,6 @@ class _HomePageState extends State<HomePage> {
   }
   // ===========================================
 
-
-  // ========== V0.6 新增：认证状态检查方法 ==========
-  /// 监听Supabase认证状态，管理用户的登录/登出路由。
-  /// 这是V0.6用户系统的核心网关逻辑。
-  void _checkAuthAndRedirect() {
-    print('=== 开始检查认证状态 ===');
-    
-    // 监听Supabase认证状态变化
-    final _ = Supabase.instance.client.auth.onAuthStateChange.listen((data) {
-      final AuthChangeEvent event = data.event;
-      final Session? session = data.session;
-      
-      print('认证状态变化: $event, 用户: ${session?.user.email ?? "未登录"}');
-      
-      if (event == AuthChangeEvent.signedIn && mounted) {
-        // 用户刚登录成功，重新加载预言数据
-        _initializeApp();
-      } else if (event == AuthChangeEvent.signedOut && mounted) {
-        // 用户已退出，清空数据
-        setState(() {
-          _predictions = [];
-          _isLoading = false;
-        });
-        
-        // ========== 修复：退出登录后跳转到登录页 ==========
-        print('用户已退出，准备跳转到登录页面');
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const LoginPage(),
-              ),
-            );
-          }
-        });
-        // ===========================================
-      } else if (event == AuthChangeEvent.initialSession && mounted) {
-        // 初始会话处理
-        print('初始会话检查完成');
-      }
-    });
-    
-    // 立即检查当前状态
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final currentUser = Supabase.instance.client.auth.currentUser;
-      print('当前用户状态: ${currentUser?.email ?? "未登录"}');
-      
-      if (currentUser == null && mounted) {
-        print('用户未登录，跳转到登录页面');
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => const LoginPage(),
-          ),
-        );
-      } else {
-        print('用户已登录: ${currentUser?.email}');
-      }
-    });
-  }
-  // ===============================================
-
-  // ========== V0.6 新增：退出确认对话框 ==========
-  void _showLogoutDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('确认退出'),
-        content: const Text('确定要退出登录吗？退出后需要重新登录才能访问您的预言。'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('取消'),
-          ),
-          TextButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              await Supabase.instance.client.auth.signOut();
-            },
-            child: const Text('退出'),
-          ),
-        ],
-      ),
-    );
-  }
-  // ===========================================
-
   // ========== V0.4 新增：过滤预言列表的方法 ==========
 
   /// 获取过滤后的预言列表
@@ -406,6 +320,19 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  // ========== 注释掉灵光一现导航方法 ==========
+  // Future<void> _navigateToIdeaPage() async {
+  //   final result = await Navigator.push(
+  //     context,
+  //     MaterialPageRoute(builder: (context) => const IdeaPage()),
+  //   );
+  // 
+  //   if (result == true) {
+  //     _loadPredictions();
+  //   }
+  // }
+  // =========================================
+
   Future<void> _navigateToDetailPage(String predictionId) async {
     final result = await Navigator.push(
       context,
@@ -511,9 +438,11 @@ class _HomePageState extends State<HomePage> {
                 ),
               ],
             ),
+      // ========== 修改FloatingActionButton：简化，直接跳转到创建预言 ==========
       floatingActionButton: FloatingActionButton(
         onPressed: _navigateToCreatePage,
         backgroundColor: Colors.blue,
+        tooltip: '创建新预言',
         child: const Icon(Icons.add, size: 28),
       ),
     );
