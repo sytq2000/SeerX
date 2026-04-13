@@ -1,14 +1,17 @@
 // create_page.dart
-// 版本: V0.6.3
+// 版本: V0.6.5
 // 创建日期: 2026-04-10
-// 修改日期: 2026-04-10
-// 修改目的: 修复调用PredictionService.addPrediction时的参数错误
+// 修改日期: 2026-04-13
+// 修改目的: 修复编辑功能的构造函数参数问题
 import 'package:flutter/material.dart';
+import '../models/prediction.dart';
 import '../services/prediction_service.dart';
 
 class CreatePage extends StatefulWidget {
-  const CreatePage({super.key});
-
+  final Prediction? prediction; // 如果是编辑模式，传入prediction
+  
+  const CreatePage({super.key, this.prediction});
+  
   @override
   State<CreatePage> createState() => _CreatePageState();
 }
@@ -17,7 +20,7 @@ class _CreatePageState extends State<CreatePage> {
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _contentController = TextEditingController();
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
-  DateTime _selectedDate = DateTime.now().add(const Duration(days: 7));
+  late DateTime _selectedDate;
   
   // 标签状态
   String? _selectedCategory;
@@ -26,6 +29,36 @@ class _CreatePageState extends State<CreatePage> {
   ];
   
   bool _isCreating = false;
+  bool _isEditingMode = false;
+  
+  @override
+  void initState() {
+    super.initState();
+    
+    _isEditingMode = widget.prediction != null;
+    
+    if (_isEditingMode) {
+      // 编辑模式：用预测数据填充表单
+      _titleController.text = widget.prediction!.title;
+      _contentController.text = widget.prediction!.description;
+      _selectedDate = widget.prediction!.verificationDate;
+      
+      // 设置标签
+      if (widget.prediction!.tags.isNotEmpty) {
+        _selectedCategory = widget.prediction!.tags.first;
+      }
+    } else {
+      // 创建模式：使用默认值
+      _selectedDate = DateTime.now().add(const Duration(days: 7));
+    }
+  }
+  
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _contentController.dispose();
+    super.dispose();
+  }
   
   Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
@@ -71,29 +104,51 @@ class _CreatePageState extends State<CreatePage> {
     });
     
     try {
-      // 调用服务层方法，传入所有必需参数
-      await PredictionService.addPrediction(
-        title: title,
-        content: content,
-        dueDate: _selectedDate,
-        tag: _selectedCategory ?? 'general',
-      );
-      
-      // 返回主页并通知刷新
-      if (mounted) {
-        Navigator.pop(context, true);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('预言创建成功！')),
+      if (_isEditingMode && widget.prediction != null) {
+        // 编辑模式：使用 copyWith 方法更新预言
+        final updatedPrediction = widget.prediction!.copyWith(
+          title: title,
+          description: content,
+          verificationDate: _selectedDate,
+          tags: _selectedCategory != null ? [_selectedCategory!] : [],
+          updatedAt: DateTime.now(),
         );
+        
+        await PredictionService.updatePrediction(updatedPrediction);
+        
+        if (mounted) {
+          Navigator.pop(context, true);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('预言更新成功！'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } else {
+        // 创建模式：新增预言
+        await PredictionService.addPrediction(
+          title: title,
+          content: content,
+          dueDate: _selectedDate,
+          tag: _selectedCategory ?? 'general',
+        );
+        
+        if (mounted) {
+          Navigator.pop(context, true);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('预言创建成功！')),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('创建失败: $e')),
+          SnackBar(
+            content: Text(_isEditingMode ? '更新失败: $e' : '创建失败: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
-      }
-    } finally {
-      if (mounted) {
         setState(() {
           _isCreating = false;
         });
@@ -105,7 +160,7 @@ class _CreatePageState extends State<CreatePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('新建预言'),
+        title: Text(_isEditingMode ? '编辑预言' : '新建预言'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
@@ -120,9 +175,9 @@ class _CreatePageState extends State<CreatePage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // 标题
-              const Text(
-                '写下你的预言',
-                style: TextStyle(
+              Text(
+                _isEditingMode ? '编辑你的预言' : '写下你的预言',
+                style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
                 ),
@@ -130,9 +185,9 @@ class _CreatePageState extends State<CreatePage> {
               
               const SizedBox(height: 8),
               
-              const Text(
-                '清晰地描述你预测会发生的事情',
-                style: TextStyle(color: Colors.grey),
+              Text(
+                _isEditingMode ? '修改预言的内容和到期时间' : '清晰地描述你预测会发生的事情',
+                style: const TextStyle(color: Colors.grey),
               ),
               
               const SizedBox(height: 24),
@@ -277,9 +332,9 @@ class _CreatePageState extends State<CreatePage> {
                             strokeWidth: 2,
                           ),
                         )
-                      : const Text(
-                          '发布预言',
-                          style: TextStyle(fontSize: 16),
+                      : Text(
+                          _isEditingMode ? '保存更改' : '发布预言',
+                          style: const TextStyle(fontSize: 16),
                         ),
                 ),
               ),

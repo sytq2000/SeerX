@@ -41,7 +41,7 @@ class PredictionCard extends StatelessWidget {
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: Color(prediction.statusColor).withOpacity(0.1),
+                      color: Color(prediction.statusColor).withAlpha(25),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
                         color: Color(prediction.statusColor),
