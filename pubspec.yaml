@@ -1,10 +1,10 @@
 # pubspec.yaml
-# 版本: V0.6.2
+# 版本: V0.6.3
 # 修改日期: 2026-04-10
-# 修改目的: 添加uuid依赖用于生成唯一ID
+# 修改目的: 修复重复依赖，移除image_cropper
 name: my_prediction_app
 description: A prediction tracking application
-version: 0.6.2+1  # 更新版本号
+version: 0.6.3+1  # 更新版本号
 publish_to: 'none'
 
 environment:
@@ -13,19 +13,37 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  # UI
+
+  # ========== UI 组件 ==========
   cupertino_icons: ^1.0.6
   flutter_svg: ^2.0.9
-  # 数据
-  supabase_flutter: ^2.1.1
+  flutter_slidable: ^3.0.0
+  percent_indicator: ^4.2.3
+  cached_network_image: ^3.3.0
+  table_calendar: ^3.0.10
+  date_picker_timeline: ^1.2.6
+
+  # ========== 数据与状态管理 ==========
+  # Supabase 数据库和认证
+  supabase_flutter: ^2.1.6
+  
+  # 状态管理
   provider: ^6.1.1
-  uuid: ^4.3.0  # 新增：用于生成唯一ID
+  flutter_hooks: ^0.20.5
+  
+  # 数据工具
+  uuid: ^4.3.0
   intl: ^0.19.0
-  # 其他
   flutter_dotenv: ^5.2.1
   shared_preferences: ^2.2.2
+  
   # 图表
   fl_chart: ^0.66.0
+  
+  # ========== 图片相关 ==========
+  # 暂时注释掉 image_picker 和 image_cropper，等需要时再添加
+  # image_picker: ^1.0.4
+  # image_cropper: ^5.0.2  # 暂时移除，有版本冲突
 
 dev_dependencies:
   flutter_test:
