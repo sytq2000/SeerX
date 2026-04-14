@@ -1,11 +1,11 @@
 // detail_page.dart
-// 版本: V0.6.3
-// 修改日期: 2026-04-10
-// 修改目的: 修复状态显示和裁决逻辑
+// 版本: V0.6.5
+// 修改日期: 2026-04-13
+// 修改目的: 移除底部编辑删除按钮，只保留右上角图标
 import 'package:flutter/material.dart';
 import '../models/prediction.dart';
 import '../services/prediction_service.dart';
-import '../widgets/status_badge.dart';
+import '../pages/create_page.dart';
 
 class DetailPage extends StatefulWidget {
   final String predictionId;
@@ -49,6 +49,85 @@ class _DetailPageState extends State<DetailPage> {
     }
   }
 
+  // 编辑预言
+  Future<void> _editPrediction() async {
+    if (_prediction == null) return;
+    
+    // 跳转到编辑页面
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CreatePage(
+          prediction: _prediction!,
+        ),
+      ),
+    );
+    
+    // 如果编辑成功，重新加载预言
+    if (result == true && mounted) {
+      await _loadPrediction();
+    }
+  }
+  
+  // 删除预言
+  Future<void> _deletePrediction() async {
+    if (_prediction == null) return;
+    
+    // 确认对话框
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('确认删除'),
+          content: const Text('确定要删除这个预言吗？此操作不可撤销。'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('取消'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('删除', style: TextStyle(color: Colors.red)),
+            ),
+          ],
+        );
+      },
+    );
+    
+    if (confirm != true) return;
+    
+    setState(() {
+      _isLoading = true;
+    });
+    
+    try {
+      await PredictionService.deletePrediction(_prediction!.id);
+      
+      if (mounted) {
+        // 返回并通知列表刷新
+        Navigator.pop(context, true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('预言删除成功'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('删除失败: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _judgePrediction(bool isSuccess) async {
     if (_prediction == null) return;
     
@@ -81,7 +160,7 @@ class _DetailPageState extends State<DetailPage> {
           SnackBar(
             content: Text('裁决失败: $e'),
             backgroundColor: Colors.red,
-          )
+          ),
         );
       }
     }
@@ -100,6 +179,21 @@ class _DetailPageState extends State<DetailPage> {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
         ),
+        // 添加编辑和删除按钮
+        actions: _prediction == null
+            ? null
+            : [
+                IconButton(
+                  icon: const Icon(Icons.edit),
+                  onPressed: _isLoading ? null : _editPrediction,
+                  tooltip: '编辑预言',
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete),
+                  onPressed: _isLoading ? null : _deletePrediction,
+                  tooltip: '删除预言',
+                ),
+              ],
       ),
       
       body: _isLoading
@@ -121,11 +215,11 @@ class _DetailPageState extends State<DetailPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 状态徽章 - 使用Prediction的statusText
+          // 状态徽章
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: Color(prediction.statusColor).withOpacity(0.1),
+              color: Color(prediction.statusColor).withAlpha(25),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color: Color(prediction.statusColor),
