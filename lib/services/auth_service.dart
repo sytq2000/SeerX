@@ -89,4 +89,15 @@ class AuthService {
   static Stream<AuthState> get authStateChanges {
     return _supabase.auth.onAuthStateChange;
   }
+
+  static Future<void> logout() async {
+    try {
+      await Supabase.instance.client.auth.signOut();
+    } catch (e) {
+      print('退出登录失败: $e');
+      rethrow;
+    }
+  }
+
+
 }

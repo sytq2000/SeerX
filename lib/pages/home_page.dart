@@ -13,6 +13,7 @@ import 'detail_page.dart';
 // 注释掉灵光一现页面导入
 // import 'idea_page.dart';
 import 'login_page.dart';
+import 'profile_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -370,9 +371,10 @@ class _HomePageState extends State<HomePage> {
             icon: const Icon(Icons.person),
             onSelected: (value) {
               if (value == 'profile') {
-                // 个人中心（V0.7实现）
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('个人中心功能将在V0.7中实现')),
+                // 个人中心 - 现在可以访问了
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const ProfilePage()),
                 );
               } else if (value == 'logout') {
                 _showLogoutDialog();
