@@ -1,10 +1,10 @@
 # pubspec.yaml
-# 版本: V0.6.3
+# 版本: V0.6.4
 # 修改日期: 2026-04-10
-# 修改目的: 修复重复依赖，移除image_cropper
+# 修改目的: 修复YAML格式错误，移除无效的web配置
 name: my_prediction_app
 description: A prediction tracking application
-version: 0.6.3+1  # 更新版本号
+version: 0.6.4+1
 publish_to: 'none'
 
 environment:
@@ -23,27 +23,19 @@ dependencies:
   table_calendar: ^3.0.10
   date_picker_timeline: ^1.2.6
 
+  # URL处理
+  url_launcher: ^6.2.1
+  # 已移除：flutter_web_plugins: any
+
   # ========== 数据与状态管理 ==========
-  # Supabase 数据库和认证
-  supabase_flutter: ^2.1.6
-  
-  # 状态管理
+  supabase_flutter: ^2.12.2
   provider: ^6.1.1
   flutter_hooks: ^0.20.5
-  
-  # 数据工具
   uuid: ^4.3.0
   intl: ^0.19.0
   flutter_dotenv: ^5.2.1
   shared_preferences: ^2.2.2
-  
-  # 图表
   fl_chart: ^0.66.0
-  
-  # ========== 图片相关 ==========
-  # 暂时注释掉 image_picker 和 image_cropper，等需要时再添加
-  # image_picker: ^1.0.4
-  # image_cropper: ^5.0.2  # 暂时移除，有版本冲突
 
 dev_dependencies:
   flutter_test:
@@ -52,3 +44,6 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/
+    - .env
